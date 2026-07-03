@@ -16,6 +16,8 @@ from jellyclaw.channels.base import ChannelAdapter, IncomingMessage
 
 
 class LocalDashboardAdapter(ChannelAdapter):
+    name = "local"
+
     def __init__(self) -> None:
         self._queue: asyncio.Queue[IncomingMessage] = asyncio.Queue()
         self._sockets: set = set()  # fastapi WebSocket objects, owned by server.py

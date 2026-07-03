@@ -16,6 +16,8 @@ _MAX_LEN = 4000
 
 
 class TelegramAdapter(ChannelAdapter):
+    name = "telegram"
+
     def __init__(self, token: str | None = None):
         # Token resolved lazily so the adapter can be constructed (e.g. by
         # `jellyclaw validate` or tests) without credentials.

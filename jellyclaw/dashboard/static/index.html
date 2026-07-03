@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JellyClaw</title>
+<style>
+  :root { --bg:#0f1117; --panel:#181b24; --border:#2a2f3d; --text:#e6e8ee; --dim:#8b91a3; --accent:#5eead4; --busy:#fbbf24; }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--bg); color:var(--text); font:14px/1.5 -apple-system,'Segoe UI',sans-serif; padding:16px; }
+  h1 { font-size:18px; margin-bottom:12px; }
+  h1 span { color:var(--dim); font-weight:normal; font-size:13px; margin-left:8px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:900px){ .grid { grid-template-columns:1fr; } }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:14px; }
+  .panel h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); margin-bottom:10px; }
+  .agent { display:flex; align-items:center; gap:8px; padding:5px 0; }
+  .agent .indent { color:var(--dim); }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--dim); flex:none; }
+  .dot.working { background:var(--busy); }
+  .agent .model { color:var(--dim); font-size:12px; }
+  .agent .detail { color:var(--busy); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #log { height:340px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
+  .msg { padding:8px 10px; border-radius:8px; max-width:85%; white-space:pre-wrap; overflow-wrap:break-word; }
+  .msg.user { background:#2b3245; align-self:flex-end; }
+  .msg.agent-msg { background:#20242f; align-self:flex-start; }
+  .msg.status { color:var(--dim); font-size:12px; background:none; padding:2px 0; }
+  form { display:flex; gap:8px; }
+  input { flex:1; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:8px 10px; font:inherit; }
+  button { background:var(--accent); color:#04211c; border:none; border-radius:6px; padding:8px 14px; font:inherit; font-weight:600; cursor:pointer; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { color:var(--dim); font-weight:normal; }
+  .st-completed { color:var(--accent); } .st-failed { color:#f87171; } .st-running { color:var(--busy); }
+  details summary { cursor:pointer; }
+  .tasks { color:var(--dim); font-size:12px; padding:6px 0 0 12px; }
+  .history-panel { grid-column:1 / -1; }
+</style>
+</head>
+<body>
+<h1>JellyClaw <span>local agent dashboard</span></h1>
+<div class="grid">
+  <div class="panel">
+    <h2>Hierarchy</h2>
+    <div id="hierarchy">loading…</div>
+  </div>
+  <div class="panel">
+    <h2>Chat with the CEO</h2>
+    <div id="log"></div>
+    <form id="chat-form">
+      <input id="chat-input" placeholder="Give your company a goal…" autocomplete="off">
+      <button>Send</button>
+    </form>
+  </div>
+  <div class="panel history-panel">
+    <h2>Run history</h2>
+    <div id="history">loading…</div>
+  </div>
+</div>
+<script>
+const esc = s => (s ?? "").toString().replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function agentRow(a, depth) {
+  return `<div class="agent" style="padding-left:${depth * 18}px">
+    ${depth ? '<span class="indent">└─</span>' : ''}
+    <span class="dot ${esc(a.status)}"></span>
+    <strong>${esc(a.name)}</strong>
+    <span class="model">${esc(a.role)} · ${esc(a.model)}</span>
+    ${a.status === "working" && a.detail ? `<span class="detail">${esc(a.detail)}</span>` : ""}
+  </div>`;
+}
+
+async function refreshHierarchy() {
+  const h = await (await fetch("/api/hierarchy")).json();
+  let html = agentRow(h.ceo, 0);
+  for (const d of h.departments) {
+    html += agentRow(d.head, 1);
+    for (const w of d.workers) html += agentRow(w, 2);
+  }
+  document.getElementById("hierarchy").innerHTML = html;
+}
+
+async function refreshHistory() {
+  const runs = await (await fetch("/api/runs")).json();
+  if (!runs.length) { document.getElementById("history").textContent = "No runs yet — send the CEO a goal."; return; }
+  const rows = runs.map(r => `<tr>
+    <td>#${r.id}</td>
+    <td><details><summary>${esc(r.goal.slice(0, 120))}</summary>
+      <div class="tasks">${r.tasks.map(t => `${esc(t.agent)} (${esc(t.role)}): ${esc(t.description.slice(0, 100))} — <span class="st-${esc(t.status)}">${esc(t.status)}</span>`).join("<br>")}</div>
+      ${r.summary ? `<div class="tasks">summary: ${esc(r.summary.slice(0, 500))}</div>` : ""}
+    </details></td>
+    <td class="st-${esc(r.status)}">${esc(r.status)}</td>
+    <td>${esc(r.created_at)}</td>
+  </tr>`).join("");
+  document.getElementById("history").innerHTML =
+    `<table><tr><th>run</th><th>goal</th><th>status</th><th>started (UTC)</th></tr>${rows}</table>`;
+}
+
+const log = document.getElementById("log");
+function addMsg(text, cls) {
+  const div = document.createElement("div");
+  div.className = "msg " + cls;
+  div.textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+let ws;
+function connect() {
+  ws = new WebSocket(`ws://${location.host}/ws/chat`);
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === "message") addMsg(m.text, "agent-msg");
+    else addMsg(Object.entries(m.status).map(([k, v]) => `${k}: ${v}`).join(" · "), "status");
+  };
+  ws.onclose = () => setTimeout(connect, 1500);
+}
+connect();
+
+document.getElementById("chat-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const input = document.getElementById("chat-input");
+  if (!input.value.trim() || ws.readyState !== 1) return;
+  ws.send(input.value);
+  addMsg(input.value, "user");
+  input.value = "";
+});
+
+refreshHierarchy(); refreshHistory();
+setInterval(refreshHierarchy, 2000);
+setInterval(refreshHistory, 5000);
+</script>
+</body>
+</html>

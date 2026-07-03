@@ -67,8 +67,8 @@ class Orchestrator:
 
     async def handle_message(self, message: IncomingMessage) -> None:
         chat_id = message.chat_id
-        self.db.log_message("in", message.text, channel=self.config.channel, chat_id=chat_id)
-        run_id = self.db.create_run(message.text, self.config.channel, chat_id)
+        self.db.log_message("in", message.text, channel=self.channel.name, chat_id=chat_id)
+        run_id = self.db.create_run(message.text, self.channel.name, chat_id)
         try:
             summary = await self._execute_run(run_id, message.text, chat_id)
             self.db.finish_run(run_id, "completed", summary)
@@ -127,6 +127,6 @@ class Orchestrator:
         return summary
 
     async def _send(self, chat_id: str, text: str, run_id: int) -> None:
-        self.db.log_message("out", text, channel=self.config.channel,
+        self.db.log_message("out", text, channel=self.channel.name,
                             chat_id=chat_id, run_id=run_id)
         await self.channel.send_message(chat_id, text)

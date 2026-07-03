@@ -71,7 +71,10 @@ class Database:
 
     def __init__(self, path: Path | str | None = None):
         self.path = Path(path) if path else default_db_path()
-        self.conn = sqlite3.connect(self.path)
+        # check_same_thread=False: the dashboard's FastAPI endpoints read from
+        # a threadpool while the orchestrator writes on the event loop thread.
+        # Safe because sqlite3 serializes access and WAL lets reads not block.
+        self.conn = sqlite3.connect(self.path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA journal_mode=WAL")  # readers (dashboard) don't block the writer
         self.conn.executescript(_SCHEMA)

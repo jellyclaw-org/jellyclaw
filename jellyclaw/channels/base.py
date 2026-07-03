@@ -25,6 +25,8 @@ class IncomingMessage:
 
 
 class ChannelAdapter(ABC):
+    name: str = "channel"  # concrete adapters override; recorded on runs/messages
+
     @abstractmethod
     async def send_message(self, chat_id: str, text: str) -> None: ...
 
