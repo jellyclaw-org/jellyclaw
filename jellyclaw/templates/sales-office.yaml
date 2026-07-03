@@ -1,0 +1,30 @@
+# JellyClaw sales-office: a CEO, a sales department head, and two workers.
+# Docs: https://jellyclaw.in
+
+channel: telegram
+
+ceo:
+  model: llama3.1:8b
+  name: "The Boss"
+
+departments:
+  - name: sales
+    head:
+      model: llama3.1:8b
+    workers:
+      - name: researcher
+        model: llama3.1:8b
+        tools: [file_ops]
+      - name: copywriter
+        model: llama3.1:8b
+        tools: [file_ops]
+
+# Directory the file_ops tool is allowed to read/write in.
+workdir: .
+
+# Optional: escalate to the Claude API when local models aren't enough.
+# Requires ANTHROPIC_API_KEY in your environment. Off by default.
+escalation:
+  enabled: false
+  provider: anthropic
+  model: claude-sonnet-4-6
